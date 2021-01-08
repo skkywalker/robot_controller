@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
       box_y - robot_y,
       box_x - robot_x
     ) - yaw;
-
+    if(abs(bearing) > 3.1415) bearing *= -1;
     ROS_INFO("yaw: %f, bearing: %f", yaw, bearing+yaw);
 
     linear_speed = distance * K_LIN;
