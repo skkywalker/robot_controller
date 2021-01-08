@@ -5,8 +5,8 @@
 #include <cstdlib>
 #include <math.h>
 
-#define K_LIN 0.22
-#define K_ANG 1.0
+#define K_LIN 1.0
+#define K_ANG 0.5
 
 double get_model_info(ros::ServiceClient& client, char* model_name, char info) {
   gazebo_msgs::GetModelState srv;
@@ -38,8 +38,8 @@ double get_model_info(ros::ServiceClient& client, char* model_name, char info) {
 int main(int argc, char **argv) {
   ros::init(argc, argv, "robot_controller");
 
-  double linear_speed = 0.022;
-  double angular_speed = 1;
+  double linear_speed;
+  double angular_speed;
 
   ros::NodeHandle n;
   ros::ServiceClient client = n.serviceClient<gazebo_msgs::GetModelState>("/gazebo/get_model_state");
@@ -50,9 +50,9 @@ int main(int argc, char **argv) {
   geometry_msgs::Twist data;
 
   while(ros::ok()) {
-    double yaw = get_model_info(client, "turtlebot3_burger", 't');
-    double robot_x = get_model_info(client, "turtlebot3_burger", 'x');
-    double robot_y = get_model_info(client, "turtlebot3_burger", 'y');
+    double yaw = get_model_info(client, "/", 't');
+    double robot_x = get_model_info(client, "/", 'x');
+    double robot_y = get_model_info(client, "/", 'y');
 
     double box_x = get_model_info(client, "unit_box", 'x');
     double box_y = get_model_info(client, "unit_box", 'y');
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     float distance = sqrt(
       pow(box_x - robot_x,2) +
       pow(box_y - robot_y,2)
-    ) - 1;
+    ) - 4;
   
     float bearing = atan2(
       box_y - robot_y,
@@ -72,11 +72,11 @@ int main(int argc, char **argv) {
     linear_speed = distance * K_LIN;
     angular_speed = bearing * K_ANG;
 
-    if(linear_speed > 0.22) linear_speed = 0.22;
+    if(linear_speed > 1) linear_speed = 1;
     else if (linear_speed < 0) linear_speed = 0;
 
-    if(angular_speed > 2) angular_speed = 2;
-    else if (angular_speed < -2) angular_speed = -2;
+    if(angular_speed > 0.5) angular_speed = 0.5;
+    else if (angular_speed < -0.5) angular_speed = -0.5;
 
     data.linear.x = linear_speed;
     data.angular.z =  angular_speed;
