@@ -1,5 +1,8 @@
 import numpy as np
 from lattice import Lattice
+from shapely.geometry import Point
+from shapely.ops import cascaded_union
+import matplotlib.pyplot as plt
 
 class Controller:
     def __init__(self, lidar_step, robot_radius, robot_offset=[0,0]):
@@ -9,10 +12,20 @@ class Controller:
         self.robot_offset = robot_offset
 
     def apply_lidar(self, lidar_measurements):
-        for i, measure in enumerate(lidar_measurements):
-            if measure > self.lattice.K ** (self.lattice.Nl-1):
-                continue
-            center_x = measure*np.cos(i*self.lidar_step)
-            center_y = measure*np.sin(i*self.lidar_step)
-            self.lattice.calculate_intercept([center_x, center_y], self.robot_radius, i*self.lidar_step)
+        geometry = self.create_geometry(lidar_measurements, 4)
+        self.lattice.calculate_intercept(geometry)
         self.lattice.apply_node_cost()
+
+    def create_geometry(self, values, max_val):
+        theta = 0
+        circles_to_join = []
+        for i in values:
+            if i > max_val:
+                theta += self.lidar_step
+                continue
+            x = i*np.cos(theta)
+            y = i*np.sin(theta)
+            tmp_pol = Point(x,y).buffer(self.robot_radius)
+            circles_to_join.append(tmp_pol)
+            theta += self.lidar_step
+        return cascaded_union(circles_to_join)

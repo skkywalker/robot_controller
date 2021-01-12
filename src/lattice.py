@@ -39,9 +39,8 @@ class Triangle:
         self.edge1 = edge1
         self.edge2 = edge2
 
-    def check_collision(self, center, radius):
-        circle = Point(center).buffer(radius)
-        if circle.intersects(self.geometry):
+    def check_collision(self, geometry):
+        if geometry.intersects(self.geometry):
             self.edge1.cost = 999
             self.edge2.cost = 999
             return True
@@ -110,10 +109,9 @@ class Lattice:
         return triangles
 
 
-    def calculate_intercept(self, center, radius, lidar_angle):
-        triangles = self.find_intercepted_triangles(lidar_angle)
-        for triangle in triangles:
-            triangle.check_collision(center, radius)
+    def calculate_intercept(self, geometry):
+        for triangle in self.triangles:
+            triangle.check_collision(geometry)
 
     def apply_node_cost(self):
         for layer in self.edges:
@@ -143,12 +141,7 @@ class Lattice:
 
         for edges in self.edges:
             for edge in edges:
-                if edge.cost > 0:
-                    plt.plot([edge.x1,edge.x2], \
-                    [edge.y1,edge.y2], 'r')
-                else:
-                    plt.plot([edge.x1,edge.x2], \
-                    [edge.y1,edge.y2], 'b')
+                plt.plot([edge.x1,edge.x2], [edge.y1,edge.y2], 'k')
         plt.show()
 
     def plot_triangles(self):
