@@ -1,28 +1,29 @@
 import numpy as np
 from shapely.geometry import Point, Polygon, LineString
+import matplotlib.pyplot as plt
 
 class Node:
     def __init__(self, parent, r, theta, is_root=False):
+        if parent: parent.children.append(self)
         self.parent = parent
+        self.children = []
         self.r = r
         self.theta = theta
         self.is_root = is_root
-        self.cost_to_go = 0
-    
-    def __repr__(self):
-        if self.is_root:
-            return "Root node"
-        else:
-            return "Radius " + str(self.r) + "; Theta " + str(self.theta)
+        self.ctg = 0
+
+        self.x = self.r*np.cos(self.theta)
+        self.y = self.r*np.sin(self.theta)
 
 class Edge:
     def __init__(self, node_before, node_after):
         self.node_before = node_before
         self.node_after = node_after
+        self.x1 = node_before.x
+        self.y1 = node_before.y
+        self.x2 = node_after.x
+        self.y2 = node_after.y
         self.cost = 0
-
-    def __repr__(self):
-        return "Edge from " + str(self.node_before) + " to " + str(self.node_after)
 
 class Triangle:
     def __init__(self, edge1, edge2):
@@ -30,23 +31,17 @@ class Triangle:
         node_after1 = edge1.node_after
         node_after2 = edge2.node_after
 
-        self.edge1 = edge1
-        self.edge2 = edge2
-
         point_before = Point(node_before.r * np.cos(node_before.theta),node_before.r * np.sin(node_before.theta))
         point_after1 = Point(node_after1.r * np.cos(node_after1.theta),node_after1.r * np.sin(node_after1.theta))
         point_after2 = Point(node_after2.r * np.cos(node_after2.theta),node_after2.r * np.sin(node_after2.theta))
+        
         self.geometry = Polygon([point_after1, point_after2, point_before])
-        self.node_before = node_before
-        self.node_after1 = node_after1
-        self.node_after2 = node_after2
+        self.edge1 = edge1
+        self.edge2 = edge2
 
-    def collision(self, center, radius):
+    def check_collision(self, center, radius):
         circle = Point(center).buffer(radius)
-        return circle.intersects(self.geometry)
-
-    def apply_collision(self, center, radius):
-        if self.collision(center, radius):
+        if circle.intersects(self.geometry):
             self.edge1.cost = 999
             self.edge2.cost = 999
             return True
@@ -61,9 +56,9 @@ class Lattice:
         self.r0 = r0
         self.layers = []
         self.edges = []
-        self.init_lattice()
+        self.build_lattice()
 
-    def init_lattice(self):
+    def build_lattice(self):
         self.root = Node(None, 0, 0, is_root=True)
         self.layers.append(self.root)
         self.init_first_layer()
@@ -97,13 +92,11 @@ class Lattice:
     def build_triangles(self):
         self.triangles = []
         for edges in self.edges:
-            tri = []
             for i,edge in enumerate(edges):
                 if i+1 < len(edges):
-                    tri.append(Triangle(edge, edges[i+1]))
+                    self.triangles.append(Triangle(edge, edges[i+1]))
                 else:
-                    tri.append(Triangle(edge, edges[0]))
-            self.triangles.append(tri)
+                    self.triangles.append(Triangle(edge, edges[0]))
 
     def find_intercepted_triangles(self, lidar_angle):
         max_radius = self.K**(self.Nl-1)
@@ -111,58 +104,57 @@ class Lattice:
         p1 = (0.1*np.cos(lidar_angle),0.1*np.sin(lidar_angle))
         p2 = (max_radius*np.cos(lidar_angle),max_radius*np.sin(lidar_angle))
         line = LineString([p1, p2])
-        for tris in self.triangles:
-            for triangle in tris:
-                if line.intersects(triangle.geometry):
-                    triangles.append(triangle)
+        for tri in self.triangles:
+            if line.intersects(tri.geometry):
+                triangles.append(tri)
         return triangles
 
 
     def calculate_intercept(self, center, radius, lidar_angle):
         triangles = self.find_intercepted_triangles(lidar_angle)
         for triangle in triangles:
-            triangle.apply_collision(center, radius)
+            triangle.check_collision(center, radius)
 
     def apply_node_cost(self):
         for layer in self.edges:
             for edge in layer:
-                edge.node_after.cost_to_go = edge.node_before.cost_to_go + edge.cost
+                edge.node_after.ctg = edge.node_before.ctg + edge.cost
 
     def plot(self):
-        import matplotlib.pyplot as plt
-        plt.polar(self.layers[0].theta,self.layers[0].r,'k.', zorder=3)
+        plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
         for layer in self.layers[1:]:
             for node in layer:
-                plt.polar(node.theta, node.r, 'k.', zorder=3)
+                plt.plot(node.x, node.y, 'k.', zorder=3)
 
         for edges in self.edges:
             for edge in edges:
-                plt.polar([edge.node_before.theta,edge.node_after.theta], \
-                    [edge.node_before.r,edge.node_after.r])
+                plt.plot([edge.x1,edge.x2], \
+                    [edge.y1,edge.y2])
         plt.show()
 
     def plot_node_cost(self):
-        import matplotlib.pyplot as plt
-        plt.polar(self.layers[0].theta,self.layers[0].r,'k.', zorder=3)
+        plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
         for layer in self.layers[1:]:
             for node in layer:
-                if node.cost_to_go > 0:
-                    plt.polar(node.theta, node.r, 'r.', zorder=3)
+                if node.ctg > 0:
+                    plt.plot(node.x, node.y, 'r.', zorder=3)
                 else:
-                    plt.polar(node.theta, node.r, 'k.', zorder=3)
+                    plt.plot(node.x, node.y, 'k.', zorder=3)
 
         for edges in self.edges:
             for edge in edges:
-                plt.polar([edge.node_before.theta,edge.node_after.theta], \
-                    [edge.node_before.r,edge.node_after.r], 'b')
+                if edge.cost > 0:
+                    plt.plot([edge.x1,edge.x2], \
+                    [edge.y1,edge.y2], 'r')
+                else:
+                    plt.plot([edge.x1,edge.x2], \
+                    [edge.y1,edge.y2], 'b')
         plt.show()
 
     def plot_triangles(self):
-        import matplotlib.pyplot as plt
 
-        for triangles in self.triangles:
-            for triangle in triangles:
-                plt.plot(*triangle.geometry.exterior.xy)
+        for triangle in self.triangles:
+            plt.plot(*triangle.geometry.exterior.xy)
         plt.show()
 
     def reset_edges_cost(self):
