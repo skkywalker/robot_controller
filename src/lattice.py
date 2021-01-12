@@ -47,8 +47,8 @@ class Triangle:
 
     def apply_collision(self, center, radius):
         if self.collision(center, radius):
-            self.node_after1.cost_to_go = 999
-            self.node_after2.cost_to_go = 999
+            self.edge1.cost = 999
+            self.edge2.cost = 999
             return True
         return False
 
@@ -123,6 +123,11 @@ class Lattice:
         for triangle in triangles:
             triangle.apply_collision(center, radius)
 
+    def apply_node_cost(self):
+        for layer in self.edges:
+            for edge in layer:
+                edge.node_after.cost_to_go = edge.node_before.cost_to_go + edge.cost
+
     def plot(self):
         import matplotlib.pyplot as plt
         plt.polar(self.layers[0].theta,self.layers[0].r,'k.', zorder=3)
@@ -136,6 +141,22 @@ class Lattice:
                     [edge.node_before.r,edge.node_after.r])
         plt.show()
 
+    def plot_node_cost(self):
+        import matplotlib.pyplot as plt
+        plt.polar(self.layers[0].theta,self.layers[0].r,'k.', zorder=3)
+        for layer in self.layers[1:]:
+            for node in layer:
+                if node.cost_to_go > 0:
+                    plt.polar(node.theta, node.r, 'r.', zorder=3)
+                else:
+                    plt.polar(node.theta, node.r, 'k.', zorder=3)
+
+        for edges in self.edges:
+            for edge in edges:
+                plt.polar([edge.node_before.theta,edge.node_after.theta], \
+                    [edge.node_before.r,edge.node_after.r], 'b')
+        plt.show()
+
     def plot_triangles(self):
         import matplotlib.pyplot as plt
 
@@ -143,3 +164,8 @@ class Lattice:
             for triangle in triangles:
                 plt.plot(*triangle.geometry.exterior.xy)
         plt.show()
+
+    def reset_edges_cost(self):
+        for edges in self.edges:
+            for edge in edges:
+                edge.cost = 0

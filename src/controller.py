@@ -15,3 +15,4 @@ class Controller:
             center_x = measure*np.cos(i*self.lidar_step)
             center_y = measure*np.sin(i*self.lidar_step)
             self.lattice.calculate_intercept([center_x, center_y], self.robot_radius, i*self.lidar_step)
+        self.lattice.apply_node_cost()
