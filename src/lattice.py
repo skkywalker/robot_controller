@@ -23,6 +23,7 @@ class Edge:
         self.y1 = node_before.y
         self.x2 = node_after.x
         self.y2 = node_after.y
+        self.theta = np.arctan2(self.y2-self.y1,self.x2-self.x1)
         self.cost = 0
 
 class Triangle:
@@ -41,8 +42,8 @@ class Triangle:
 
     def check_collision(self, geometry):
         if geometry.intersects(self.geometry):
-            self.edge1.cost = 999
-            self.edge2.cost = 999
+            self.edge1.cost = 1
+            self.edge2.cost = 1
             return True
         return False
 
@@ -109,14 +110,19 @@ class Lattice:
         return triangles
 
 
-    def calculate_intercept(self, geometry):
+    def calculate_intercept(self, geometry, plot_geometry=False):
+        if plot_geometry:
+            plt.plot(*geometry.exterior.xy)
         for triangle in self.triangles:
             triangle.check_collision(geometry)
 
-    def apply_node_cost(self):
+    def apply_node_cost(self, global_goal):
         for layer in self.edges:
             for edge in layer:
+                if edge.cost != 1:
+                    edge.cost = 0.9/(np.pi)*abs((global_goal-edge.theta+np.pi)%(2*np.pi)-np.pi)
                 edge.node_after.ctg = edge.node_before.ctg + edge.cost
+                if edge.node_after.ctg > 1: edge.node_after.ctg = 1
 
     def plot(self):
         plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
@@ -134,18 +140,14 @@ class Lattice:
         plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
         for layer in self.layers[1:]:
             for node in layer:
-                if node.ctg > 0:
-                    plt.plot(node.x, node.y, 'r.', zorder=3)
-                else:
-                    plt.plot(node.x, node.y, 'k.', zorder=3)
+                plt.plot(node.x, node.y, color=(node.ctg, .5, 0), marker='.', zorder=3)
 
         for edges in self.edges:
             for edge in edges:
-                plt.plot([edge.x1,edge.x2], [edge.y1,edge.y2], 'k')
+                plt.plot([edge.x1,edge.x2], [edge.y1,edge.y2], color=(edge.cost,0,0))
         plt.show()
 
     def plot_triangles(self):
-
         for triangle in self.triangles:
             plt.plot(*triangle.geometry.exterior.xy)
         plt.show()

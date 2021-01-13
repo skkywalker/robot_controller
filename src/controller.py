@@ -10,11 +10,12 @@ class Controller:
         self.lidar_step = lidar_step # in radians
         self.robot_radius = robot_radius
         self.robot_offset = robot_offset
+        self.global_goal = 0
 
     def apply_lidar(self, lidar_measurements):
         geometry = self.create_geometry(lidar_measurements, 4)
-        self.lattice.calculate_intercept(geometry)
-        self.lattice.apply_node_cost()
+        self.lattice.calculate_intercept(geometry, plot_geometry=True)
+        self.lattice.apply_node_cost(self.global_goal)
 
     def create_geometry(self, values, max_val):
         theta = 0
