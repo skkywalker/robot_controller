@@ -11,6 +11,7 @@ class Node:
         self.theta = theta
         self.is_root = is_root
         self.ctg = 0
+        self.is_lowest = False
 
         self.x = self.r*np.cos(self.theta)
         self.y = self.r*np.sin(self.theta)
@@ -42,8 +43,8 @@ class Triangle:
 
     def check_collision(self, geometry):
         if geometry.intersects(self.geometry):
-            self.edge1.cost = 1
-            self.edge2.cost = 1
+            self.edge1.cost = float("inf")
+            self.edge2.cost = float("inf")
             return True
         return False
 
@@ -119,10 +120,27 @@ class Lattice:
     def apply_node_cost(self, global_goal):
         for layer in self.edges:
             for edge in layer:
-                if edge.cost != 1:
-                    edge.cost = 0.9/(np.pi)*abs((global_goal-edge.theta+np.pi)%(2*np.pi)-np.pi)
+                if edge.cost != float("inf"):
+                    edge.cost = 1/(np.pi)*abs((global_goal-edge.theta+np.pi)%(2*np.pi)-np.pi)
                 edge.node_after.ctg = edge.node_before.ctg + edge.cost
-                if edge.node_after.ctg > 1: edge.node_after.ctg = 1
+        return self.find_cheapest_path()
+
+    def find_cheapest_path(self):
+        lowest = float("inf")
+        lowest_node = None
+        for node in self.layers[-1]:
+            if node.ctg < lowest:
+                lowest = node.ctg
+                node.is_lowest = True
+                if lowest_node:
+                    lowest_node.is_lowest = False
+                lowest_node = node
+        node = lowest_node
+        while not node.is_root:
+            node.is_lowest = True
+            node = node.parent
+        for node in self.layers[1]:
+            if node.is_lowest: return node.x, node.y
 
     def plot(self):
         plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
@@ -138,13 +156,23 @@ class Lattice:
 
     def plot_node_cost(self):
         plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
+        i = 1
         for layer in self.layers[1:]:
             for node in layer:
-                plt.plot(node.x, node.y, color=(node.ctg, .5, 0), marker='.', zorder=3)
+                if node.is_lowest and i == 1:
+                    plt.plot(node.x, node.y, color=(0, 0, 1), marker='.', zorder=3)
+                elif node.ctg != float("inf"):
+                    plt.plot(node.x, node.y, color=(node.ctg/self.Nl, 0.5, 0), marker='.', zorder=3)
+                else:
+                    plt.plot(node.x, node.y, color=(1, 0, 0), marker='.', zorder=3)
+            i += 1
 
         for edges in self.edges:
             for edge in edges:
-                plt.plot([edge.x1,edge.x2], [edge.y1,edge.y2], color=(edge.cost,0,0))
+                if edge.cost == float("inf"):
+                    plt.plot([edge.x1,edge.x2], [edge.y1,edge.y2], color=(1,0,0))
+                else:
+                    plt.plot([edge.x1,edge.x2], [edge.y1,edge.y2], color=(edge.cost,0,0))
         plt.show()
 
     def plot_triangles(self):
