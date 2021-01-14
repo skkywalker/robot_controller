@@ -1,6 +1,12 @@
 import numpy as np
-from shapely.geometry import Point, Polygon, LineString
 import matplotlib.pyplot as plt
+from shapely.geometry import Point, Polygon, LineString
+from shapely.ops import cascaded_union
+
+import rospy
+from gazebo_msgs.srv import GetModelState
+from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
 
 class Node:
     def __init__(self, parent, r, theta, is_root=False):
@@ -127,7 +133,7 @@ class Lattice:
 
     def find_cheapest_path(self):
         lowest = float("inf")
-        lowest_node = None
+        lowest_node = self.layers[0]
         for node in self.layers[-1]:
             if node.ctg < lowest:
                 lowest = node.ctg
@@ -141,6 +147,7 @@ class Lattice:
             node = node.parent
         for node in self.layers[1]:
             if node.is_lowest: return node.x, node.y
+        return 0,0
 
     def plot(self):
         plt.plot(self.layers[0].x,self.layers[0].y,'k.', zorder=3)
@@ -184,3 +191,61 @@ class Lattice:
         for edges in self.edges:
             for edge in edges:
                 edge.cost = 0
+
+class Controller:
+    def __init__(self, lidar_step, robot_radius, robot_offset=[0,0]):
+        self.lattice = Lattice(2, 16, 3, 3, 1)
+        self.lidar_step = lidar_step # in radians
+        self.robot_radius = robot_radius
+        self.robot_offset = robot_offset
+        self.global_goal = 0
+
+    def apply_lidar(self, lidar_measurements):
+        geometry = self.create_geometry(lidar_measurements, 4)
+        self.lattice.calculate_intercept(geometry, plot_geometry=False)
+        return self.lattice.apply_node_cost(self.global_goal)
+
+    def create_geometry(self, values, max_val):
+        theta = 0
+        circles_to_join = []
+        for i in values:
+            if i > max_val:
+                theta += self.lidar_step
+                continue
+            x = i*np.cos(theta)
+            y = i*np.sin(theta)
+            tmp_pol = Point(x,y).buffer(self.robot_radius)
+            circles_to_join.append(tmp_pol)
+            theta += self.lidar_step
+        return cascaded_union(circles_to_join)
+
+controller = Controller(0.017501922324299812, 0.15)
+x = 0
+y = 0
+
+def laser_callback(data : LaserScan):
+    global controller, x, y
+    m = list(data.ranges)
+    for i, _ in enumerate(m):
+        if(_ == float("inf")):
+            m[i] = 10
+    x, y = controller.apply_lidar(m)
+    print(x,y)
+
+print("Initializing controller...")
+
+
+rospy.init_node('controller', anonymous=True)
+
+pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+rospy.Subscriber("/scan", LaserScan, laser_callback)
+get_model_state = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
+
+get_model_state('turtlebot3_burger','')
+
+
+rate = rospy.Rate(10)
+
+while not rospy.is_shutdown():
+    
+    rate.sleep()
